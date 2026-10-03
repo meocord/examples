@@ -4,8 +4,8 @@ import {
   ButtonStyle,
   type ChatInputCommandInteraction,
   EmbedBuilder,
+  LabelBuilder,
   MessageFlags,
-  type ModalActionRowComponentBuilder,
   ModalBuilder,
   type ModalSubmitInteraction,
   TextInputBuilder,
@@ -19,9 +19,9 @@ import { FeedbackService } from '@src/feedback/feedback.service'
 import { FeedbackSettings } from '@src/feedback/feedback.settings'
 
 const field = (customId: string, label: string, style: TextInputStyle, maxLength: number) =>
-  new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(
-    new TextInputBuilder().setCustomId(customId).setLabel(label).setStyle(style).setMaxLength(maxLength),
-  )
+  new LabelBuilder()
+    .setLabel(label)
+    .setTextInputComponent(new TextInputBuilder().setCustomId(customId).setStyle(style).setMaxLength(maxLength))
 
 @Controller()
 export class FeedbackController {
@@ -38,7 +38,7 @@ export class FeedbackController {
       new ModalBuilder()
         .setCustomId('feedback/submit')
         .setTitle('Feedback')
-        .addComponents(
+        .addLabelComponents(
           field('about', 'What is it about?', TextInputStyle.Short, 80),
           field('details', 'Tell us more', TextInputStyle.Paragraph, 1000),
         ),
