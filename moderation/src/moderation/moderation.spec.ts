@@ -72,13 +72,13 @@ function makeServer(id: string) {
   const guild = createMockGuild({ id, roles: Object.values(roles), members: Object.values(members) })
   // The mock doesn't model guild.members.me yet: the bot's own member, as the gateway caches it
   Object.defineProperty(guild.members, 'me', { value: members.bot })
-  return { guild, members }
+  return { guild, members, roles }
 }
 
 /** The app as the bot runs it, in one server, over `database`: a new in-memory one unless given. */
 function setup(database = openDatabase(':memory:')) {
   // A fixed id, so a restarted app over the same database finds the server's cases
-  const { guild, members } = makeServer('100000000000000001')
+  const { guild, members, roles } = makeServer('100000000000000001')
   const module = MeoCordTestingModule.fromApp(App).overrideProvider(DATABASE).useValue(database).compile()
   const inGuild = { guildId: guild.id, guild }
 
@@ -97,7 +97,19 @@ function setup(database = openDatabase(':memory:')) {
     const customId = sent.components[0].components.find(button => button.custom_id.endsWith(`/${choice}`))?.custom_id
     return createMockInteraction(ButtonInteraction, { customId, user, ...inGuild })
   }
-  return { module, guild, members, mod, press, inGuild }
+  // Right-click a message by `author`, then Apps › Warn author
+  const warnAuthor = (author: User, user: User = moderator) => {
+    const message = createMockMessage({ author, guild })
+    const menu = createMockInteraction(MessageContextMenuCommandInteraction, {
+      commandName: 'Warn author',
+      user,
+      targetId: message.id,
+      targetMessage: message,
+      ...inGuild,
+    })
+    return { message, menu }
+  }
+  return { module, guild, members, roles, mod, press, warnAuthor, inGuild }
 }
 
 /** What the bot last answered, as Discord received it. */
@@ -139,22 +151,41 @@ describe('the moderation bot', () => {
   })
 
   it('warns a message’s author from the message, linking it', async () => {
-    const { module, guild, mod, inGuild } = setup()
-    const message = createMockMessage({ author: offender, guild })
+    const { module, mod, warnAuthor } = setup()
+    const { message, menu } = warnAuthor(offender)
 
-    const menu = createMockInteraction(MessageContextMenuCommandInteraction, {
-      commandName: 'Warn author',
-      user: moderator,
-      targetId: message.id,
-      targetMessage: message,
-      ...inGuild,
-    })
     await module.dispatch(menu)
 
     expect(lastPayload(menu).content).toBe(`Case #1: warned ${offender}.`)
     const lookedUp = mod(moderator, 'case', { id: 1 })
     await module.dispatch(lookedUp)
     expect(lastPayload(lookedUp).embeds?.[0].description).toBe(`For this message: ${message.url}`)
+  })
+
+  // A message's member is only a cache lookup, and with the Guilds intent alone its author often isn't cached
+  it('fetches an uncached author, and refuses to warn one who ranks above the moderator', async () => {
+    const { module, guild, warnAuthor } = setup()
+    const { menu } = warnAuthor(veteran)
+    // The mock doesn't model the member cache yet: here it misses, as for an uncached author, and the fetch finds them
+    guild.members.resolve.mockReturnValueOnce(null)
+
+    const { ran } = await module.dispatch(menu)
+
+    expect(ran).toBe(false)
+    expect(refusal(menu)).toMatch(/^Your highest role must be above /)
+  })
+
+  it('refuses to warn a message’s author who has left the server', async () => {
+    const { module, guild, warnAuthor } = setup()
+    const { menu } = warnAuthor(offender)
+    // The mock doesn't model the member cache yet: here it misses, and Discord answers Unknown Member
+    guild.members.resolve.mockReturnValueOnce(null)
+    guild.members.fetch.mockRejectedValueOnce(createDiscordError(RESTJSONErrorCodes.UnknownMember))
+
+    const { ran } = await module.dispatch(menu)
+
+    expect(ran).toBe(false)
+    expect(refusal(menu)).toBe('Its author has left the server.')
   })
 
   it('times a member out only once the moderator confirms, and only once', async () => {
@@ -217,6 +248,24 @@ describe('the moderation bot', () => {
     expect(guild.members.ban).not.toHaveBeenCalled()
   })
 
+  // Default member permissions only decide who Discord shows a command to, and a server's admins can change them
+  it.each([
+    ['/mod warn', (t: ReturnType<typeof setup>) => t.mod(veteran, 'warn', { member: offender, reason: 'Spam' })],
+    [
+      '/mod timeout',
+      (t: ReturnType<typeof setup>) => t.mod(veteran, 'timeout', { member: offender, minutes: 10, reason: 'Spam' }),
+    ],
+    ['Warn author', (t: ReturnType<typeof setup>) => t.warnAuthor(offender, veteran).menu],
+  ])('refuses %s to a member without Moderate Members, however high they rank', async (_, make) => {
+    const tested = setup()
+    const interaction = make(tested)
+
+    const { ran } = await tested.module.dispatch(interaction)
+
+    expect(ran).toBe(false)
+    expect(refusal(interaction)).toBe('You need the ModerateMembers permission for that.')
+  })
+
   it('asks for Ban Members to ban, on top of the command’s Moderate Members', async () => {
     const { module, mod } = setup()
 
@@ -245,6 +294,38 @@ describe('the moderation bot', () => {
 
     expect(ran).toBe(false)
     expect(refusal(proposal)).toMatch(/^My highest role must be above /)
+  })
+
+  it('checks the ranks again at Confirm, since roles can change while a case waits', async () => {
+    const { module, members, roles, mod, press } = setup()
+    const proposal = mod(moderator, 'timeout', { member: offender, minutes: 10, reason: 'Flooding' })
+    await module.dispatch(proposal)
+
+    // Promoted above the moderator before the moderator confirms
+    await members.offender.roles.add(roles.veteran)
+    const confirmed = press(proposal, 'confirm')
+    await module.dispatch(confirmed)
+
+    expect(refusal(confirmed)).toMatch(/^Your highest role must be above /)
+    expect(members.offender.timeout).not.toHaveBeenCalled()
+    const again = press(proposal, 'confirm')
+    await module.dispatch(again)
+    expect(refusal(again)).toBe('Case #1 has already been handled.')
+  })
+
+  it('checks Ban Members again at Confirm', async () => {
+    const { module, guild, members, roles, mod, press } = setup()
+    const proposal = mod(senior, 'ban', { member: offender, reason: 'Raid' })
+    await module.dispatch(proposal)
+
+    // Moved to a role that can still moderate, but not ban, before confirming
+    await members.senior.roles.remove(roles.senior)
+    await members.senior.roles.add(roles.moderator)
+    const confirmed = press(proposal, 'confirm', senior)
+    await module.dispatch(confirmed)
+
+    expect(refusal(confirmed)).toBe('You need the BanMembers permission for that.')
+    expect(guild.members.ban).not.toHaveBeenCalled()
   })
 
   it('explains Discord’s refusal, and records that the case didn’t happen', async () => {

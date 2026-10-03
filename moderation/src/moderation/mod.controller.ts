@@ -18,7 +18,7 @@ import { Autocomplete, Command, Controller, Defer, UseFilter, UseGuard } from 'm
 import { CommandType } from 'meocord/enum'
 import { type Action, type Case, CaseStore } from '@src/cases/case.store'
 import { DiscordRefusalFilter } from '@src/moderation/discord-refusal.filter'
-import { HierarchyGuard, OwnerGuard, RequirePermission } from '@src/moderation/guards'
+import { HierarchyGuard, memberOf, OwnerGuard, rankProblem, RequirePermission } from '@src/moderation/guards'
 import { CasesMenuBuilder, ModCommandBuilder, WarnAuthorMenuBuilder } from '@src/moderation/mod.builder'
 
 /** The moderator, the pending case and the answer, such as `mod/111/12/confirm`, each typed for the handler. */
@@ -39,8 +39,10 @@ const VERBS: Record<Action, string> = { warn: 'Warned', timeout: 'Timed out', ba
 export const describeCase = (entry: Case) =>
   `#${entry.id} ${entry.action}${entry.minutes ? ` (${entry.minutes} min)` : ''}, ${entry.status}: ${entry.reason}`
 
+// Every handler needs Moderate Members, the buttons included, so a moderator who loses it can't confirm what they proposed
 @Controller()
 @UseFilter(DiscordRefusalFilter)
+@RequirePermission(PermissionFlagsBits.ModerateMembers)
 export class ModController {
   constructor(private readonly cases: CaseStore) {}
 
@@ -76,9 +78,9 @@ export class ModController {
     await this.propose(interaction, member, { action: 'timeout', reason, minutes })
   }
 
-  // Ban Members on top of the command's Moderate Members; the permission guard runs before the hierarchy's
+  // Ban Members as well; a method's permissions replace its controller's, so it names both
   @Command('mod ban', CommandType.SLASH)
-  @RequirePermission(PermissionFlagsBits.BanMembers)
+  @RequirePermission(PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.BanMembers)
   @UseGuard(HierarchyGuard)
   async ban(interaction: ChatInputCommandInteraction, { member, reason }: { member: User; reason: string }) {
     await this.propose(interaction, member, { action: 'ban', reason })
@@ -165,6 +167,12 @@ export class ModController {
     { case: id, action }: { ownerId: string; case: number; action: 'confirm' | 'cancel' },
   ) {
     const guild = serverOf(interaction)
+    // Roles can change, and a case can wait across a restart, so the moderator must still be allowed as it runs
+    const pending = this.cases.get(guild.id, id)
+    if (action === 'confirm' && pending?.status === 'pending') {
+      const problem = await this.stillAllowed(interaction, pending)
+      if (problem && this.cases.take(guild.id, id, 'refused')) throw new UserError(problem)
+    }
     const entry = this.cases.take(guild.id, id, action === 'confirm' ? 'done' : 'cancelled')
     if (!entry) throw new UserError(`Case #${id} has already been handled.`)
     if (action === 'cancel') {
@@ -187,6 +195,17 @@ export class ModController {
       content: `Case #${id}: ${VERBS[entry.action].toLowerCase()} <@${entry.targetId}>.`,
       components: [],
     })
+  }
+
+  /** Why the moderator may no longer carry out `entry`, or undefined when they may: Ban Members, and the ranks. */
+  private async stillAllowed(interaction: ButtonInteraction, entry: Case): Promise<string | undefined> {
+    if (!interaction.inCachedGuild()) return undefined
+    if (entry.action === 'ban' && !interaction.memberPermissions.has(PermissionFlagsBits.BanMembers)) {
+      return 'You need the BanMembers permission for that.'
+    }
+    const target = await memberOf(interaction.guild, entry.targetId)
+    // A member who has left can still be banned; a timeout finds no one, and Discord says so
+    return target ? rankProblem(interaction.guild, interaction.member, target) : undefined
   }
 }
 
