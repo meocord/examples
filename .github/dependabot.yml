@@ -5,6 +5,7 @@ updates:
   - package-ecosystem: npm
     directories:
       - /feedback
+      - /moderation
     schedule:
       interval: weekly
       day: monday
