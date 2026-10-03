@@ -18,12 +18,14 @@ import {
   MeoCordTestingModule,
 } from 'meocord/testing'
 import App from '@src/app.js'
+import { FeedbackService } from '@src/feedback/feedback.service.js'
 import { FeedbackSettings } from '@src/feedback/feedback.settings.js'
 
 const staffRole = createMockInteraction(Role, { id: '300000000000000001' })
 const author = createMockUser({ id: '200000000000000001' })
 const reviewer = createMockUser({ id: '200000000000000002' })
 const stranger = createMockUser({ id: '200000000000000003' })
+const colleague = createMockUser({ id: '200000000000000004' })
 
 /** The app as the bot runs it, in one server with a review channel, a staff member and two others. */
 function setup() {
@@ -33,6 +35,7 @@ function setup() {
     channels: [review],
     members: [
       createMockMember({ user: reviewer, roles: [staffRole] }),
+      createMockMember({ user: colleague, roles: [staffRole] }),
       createMockMember({ user: author }),
       createMockMember({ user: stranger }),
     ],
@@ -60,7 +63,7 @@ function setup() {
       message: createMockMessage({ embeds: posted().embeds }),
       ...inGuild,
     })
-  return { module, command, submit, click, posted }
+  return { module, guild, review, command, submit, click, posted }
 }
 
 /** A recorded payload as Discord receives it, its builders as JSON. */
@@ -147,5 +150,45 @@ describe('the feedback bot', () => {
     await module.dispatch(stale)
 
     expect(privateAnswer(stale)).toBe('Feedback #7 is no longer held: the bot has restarted since it was posted.')
+  })
+
+  it("posts nothing and keeps nothing when the review channel can't be reached", async () => {
+    const { module, guild, review, submit } = setup()
+    // As Discord answers once the channel is deleted, or the bot can no longer see it
+    guild.channels.fetch.mockRejectedValueOnce(Object.assign(new Error('Unknown Channel'), { code: 10003 }))
+
+    // An operator's mistake rather than the member's, so it's an error that names the setting to fix
+    await expect(module.dispatch(submit())).rejects.toThrow('FEEDBACK_CHANNEL_ID')
+    expect(review.send).not.toHaveBeenCalled()
+    // The submission isn't held, so no review post can later point at it
+    expect(() => module.get(FeedbackService).decide(1, 'approved')).toThrow('no longer held')
+  })
+
+  it('completes the verdict when the author has closed their direct messages', async () => {
+    const { module, submit, click } = setup()
+    await module.dispatch(submit())
+
+    const approved = click('feedback/1/approve', reviewer)
+    approved.client.users.send.mockRejectedValueOnce(new Error('Cannot send messages to this user'))
+    await module.dispatch(approved)
+
+    // The post is edited with the verdict, and the reviewer sees no error for a DM they couldn't control
+    const calls = getResponse(approved).calls
+    expect(json<{ embeds: { footer?: { text: string } }[] }>(calls.at(-1)?.payload).embeds[0].footer?.text).toContain(
+      'Approved',
+    )
+    expect(calls.map(call => call.method)).not.toContain('followUp')
+  })
+
+  it('refuses a second verdict on the same feedback, leaving the post and the author alone', async () => {
+    const { module, submit, click } = setup()
+    await module.dispatch(submit())
+    await module.dispatch(click('feedback/1/approve', reviewer))
+
+    const late = click('feedback/1/reject', colleague)
+    await module.dispatch(late)
+
+    expect(privateAnswer(late)).toBe('Feedback #1 was already approved.')
+    expect(late.client.users.send).not.toHaveBeenCalled()
   })
 })
