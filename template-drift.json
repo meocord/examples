@@ -6,5 +6,12 @@
         "STAFF_ROLE_ID": "The role whose members may approve or reject feedback"
       }
     }
+  },
+  "moderation": {
+    ".env.example": {
+      "keys": {
+        "MODERATION_DB": "Where the case log’s SQLite file is kept, moderation.db by default"
+      }
+    }
   }
 }

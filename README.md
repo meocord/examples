@@ -6,9 +6,10 @@ version its lockfile pins and with the newest release.
 
 ## The bots
 
-| Bot                   | What it shows                                                                     |
-| --------------------- | --------------------------------------------------------------------------------- |
-| [feedback](feedback/) | A feedback form staff approve or reject: responses, presenters, guards, cooldowns |
+| Bot                       | What it shows                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [feedback](feedback/)     | A feedback form staff approve or reject: responses, presenters, guards, cooldowns                                                                 |
+| [moderation](moderation/) | Warnings, timeouts and bans with a SQLite case log: subcommands, context menus, autocomplete, confirmation buttons, guards on rank and permission |
 
 Each bot's README says what it shows and how to run it.
 
