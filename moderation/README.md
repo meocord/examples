@@ -8,8 +8,9 @@ and keeps a log of every case in SQLite.
 - `/mod case` shows a case, and completes its number from the server's cases as you type.
 - Right-click a member, then **Apps › Cases**, to list their cases. Right-click a message, then **Apps › Warn author**,
   to warn whoever wrote it, with a link to the message.
-- A moderator can act only on members below their own highest role, and only on members below the bot's. `/mod ban`
-  also needs **Ban Members**. Each is refused up front, with the reason, before anything is proposed.
+- Every action needs **Moderate Members**, and `/mod ban` needs **Ban Members** too. A moderator can act only on
+  members below their own highest role, and only on members below the bot's. Each is refused up front, with the
+  reason, before anything is proposed, and checked again at **Confirm**.
 - When Discord refuses an action anyway, as when the bot's role has lost the permission or the member has left, the
   moderator is told why in plain words, and the case records that it didn't happen.
 
@@ -17,18 +18,18 @@ Cases are kept in a SQLite file, so they, and a proposal waiting for its moderat
 
 ## What it shows
 
-| Feature                                                                                                   | Where                                                                                                                                                                      |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subcommands, each with its own handler, under one builder with default member permissions                 | [`mod.builder.ts`](src/moderation/mod.builder.ts), [`mod.controller.ts`](src/moderation/mod.controller.ts); [Subcommands](https://meocord.dev/docs/latest/subcommands)     |
-| A guard that reads a fact about its handler, `@RequirePermission(BanMembers)`, made with `createMetadata` | [`guards.ts`](src/moderation/guards.ts); [Guards](https://meocord.dev/docs/latest/guards)                                                                                  |
-| A guard that compares the moderator's, the bot's and the member's highest roles                           | `HierarchyGuard` in [`guards.ts`](src/moderation/guards.ts); [Guards](https://meocord.dev/docs/latest/guards)                                                              |
-| User and message context menus                                                                            | [`mod.builder.ts`](src/moderation/mod.builder.ts), [`mod.controller.ts`](src/moderation/mod.controller.ts); [Context menus](https://meocord.dev/docs/latest/context-menus) |
-| Confirmation buttons on a typed route, `mod/{ownerId}/{case:int}/{action:confirm\|cancel}`                | `answer` in [`mod.controller.ts`](src/moderation/mod.controller.ts); [Components](https://meocord.dev/docs/latest/components)                                              |
-| Autocomplete for an integer option                                                                        | `completeCase` in [`mod.controller.ts`](src/moderation/mod.controller.ts); [Autocomplete](https://meocord.dev/docs/latest/autocomplete)                                    |
-| An exception filter that turns Discord's refusal into words a moderator can act on                        | [`discord-refusal.filter.ts`](src/moderation/discord-refusal.filter.ts); [Exception filters](https://meocord.dev/docs/latest/exception-filters)                            |
-| A database provided under a token before login and closed as the bot stops, and a store that injects it   | [`database.provider.ts`](src/database/database.provider.ts), [`case.store.ts`](src/cases/case.store.ts); [A database](https://meocord.dev/docs/latest/recipes/database)    |
-| A pending case taken once, with one `UPDATE … WHERE status = 'pending' RETURNING`                         | `take` in [`case.store.ts`](src/cases/case.store.ts); [A moderation command](https://meocord.dev/docs/latest/recipes/moderation)                                           |
-| Tests of the whole app through `dispatch`, over a real SQLite database, a restart included                | [`moderation.spec.ts`](src/moderation/moderation.spec.ts); [Testing](https://meocord.dev/docs/latest/testing)                                                              |
+| Feature                                                                                                          | Where                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subcommands, each with its own handler, under one builder with default member permissions                        | [`mod.builder.ts`](src/moderation/mod.builder.ts), [`mod.controller.ts`](src/moderation/mod.controller.ts); [Subcommands](https://meocord.dev/docs/latest/subcommands)     |
+| A guard that reads a fact about its handler or controller, `@RequirePermission(...)`, made with `createMetadata` | [`guards.ts`](src/moderation/guards.ts); [Guards](https://meocord.dev/docs/latest/guards)                                                                                  |
+| A guard that compares the moderator's, the bot's and the member's highest roles                                  | `HierarchyGuard` in [`guards.ts`](src/moderation/guards.ts); [Guards](https://meocord.dev/docs/latest/guards)                                                              |
+| User and message context menus                                                                                   | [`mod.builder.ts`](src/moderation/mod.builder.ts), [`mod.controller.ts`](src/moderation/mod.controller.ts); [Context menus](https://meocord.dev/docs/latest/context-menus) |
+| Confirmation buttons on a typed route, `mod/{ownerId}/{case:int}/{action:confirm\|cancel}`                       | `answer` in [`mod.controller.ts`](src/moderation/mod.controller.ts); [Components](https://meocord.dev/docs/latest/components)                                              |
+| Autocomplete for an integer option                                                                               | `completeCase` in [`mod.controller.ts`](src/moderation/mod.controller.ts); [Autocomplete](https://meocord.dev/docs/latest/autocomplete)                                    |
+| An exception filter that turns Discord's refusal into words a moderator can act on                               | [`discord-refusal.filter.ts`](src/moderation/discord-refusal.filter.ts); [Exception filters](https://meocord.dev/docs/latest/exception-filters)                            |
+| A database provided under a token before login and closed as the bot stops, and a store that injects it          | [`database.provider.ts`](src/database/database.provider.ts), [`case.store.ts`](src/cases/case.store.ts); [A database](https://meocord.dev/docs/latest/recipes/database)    |
+| A pending case taken once, with one `UPDATE … WHERE status = 'pending' RETURNING`                                | `take` in [`case.store.ts`](src/cases/case.store.ts); [A moderation command](https://meocord.dev/docs/latest/recipes/moderation)                                           |
+| Tests of the whole app through `dispatch`, over a real SQLite database, a restart included                       | [`moderation.spec.ts`](src/moderation/moderation.spec.ts); [Testing](https://meocord.dev/docs/latest/testing)                                                              |
 
 ## Setup
 
@@ -38,8 +39,10 @@ Cases are kept in a SQLite file, so they, and a proposal waiting for its moderat
    permission: it answers moderators through the interactions themselves. In **Server Settings › Roles**, drag the
    bot's role above the roles of the members it should moderate; Discord refuses to act on anyone ranked at or above
    it.
-3. `/mod` and the two Apps entries show only to members with **Moderate Members**. A server's admins can change that
-   under **Server Settings › Integrations**; the bot checks every action itself either way.
+3. `/mod` and the two Apps entries show only to members with **Moderate Members**, but a server's admins can change
+   that under **Server Settings › Integrations**, so it only decides who sees them. The bot checks every action itself:
+   **Moderate Members** for each of them, **Ban Members** as well for a ban, and the ranks. It checks again at
+   **Confirm**, since roles can change while a case waits.
 4. Copy the example environment file, and fill it in:
 
    ```shell
