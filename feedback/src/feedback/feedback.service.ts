@@ -25,6 +25,8 @@ export class FeedbackService {
     const feedback = this.items.get(id)
     // A UserError is shown only to the user who clicked, as something they can act on rather than a fault
     if (!feedback) throw new UserError(`Feedback #${id} is no longer held: the bot has restarted since it was posted.`)
+    // Two staff can click at once; the second is told, and the post and the author are left as the first decided
+    if (feedback.status !== 'open') throw new UserError(`Feedback #${id} was already ${feedback.status}.`)
     feedback.status = status
     return feedback
   }
