@@ -10,6 +10,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { bots, ROOT } from './lib/bots.mjs'
+import { olderFloor } from './lib/versions.mjs'
 
 // The files `meocord create` writes that a bot keeps as generated unless it has a reason not to
 const TEMPLATE_FILES = [
@@ -148,8 +149,12 @@ function packageProblems(name, generatedDir, botDir) {
     const a = generated[field]
     const b = bot[field]
     if (typeof a === 'object' && typeof b === 'object' && a && b) {
+      // A dependency the bot keeps at a newer floor than the template's, as Dependabot raises it, hasn't drifted
+      const ranges = field === 'dependencies' || field === 'devDependencies'
       for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
-        if (a[key] !== b[key]) differing.set(`${field}.${key}`, [a[key], b[key]])
+        const same =
+          a[key] === b[key] || (ranges && a[key] !== undefined && b[key] !== undefined && !olderFloor(a[key], b[key]))
+        if (!same) differing.set(`${field}.${key}`, [a[key], b[key]])
       }
     } else if (JSON.stringify(a) !== JSON.stringify(b)) differing.set(field, [a, b])
   }
