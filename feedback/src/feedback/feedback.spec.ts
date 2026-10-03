@@ -1,8 +1,10 @@
 import {
   ButtonInteraction,
   ChatInputCommandInteraction,
+  DiscordAPIError,
   MessageFlags,
   ModalSubmitInteraction,
+  RESTJSONErrorCodes,
   Role,
   TextChannel,
 } from 'discord.js'
@@ -65,6 +67,10 @@ function setup() {
     })
   return { module, guild, review, command, submit, click, posted }
 }
+
+/** An error as discord.js throws it for Discord's answer to a request. */
+const discordError = (code: number, status: number, message: string) =>
+  new DiscordAPIError({ code, message }, code, status, 'GET', '/guilds/1/channels', {})
 
 /** A recorded payload as Discord receives it, its builders as JSON. */
 const json = <T>(payload: unknown): T => JSON.parse(JSON.stringify(payload)) as T
@@ -152,16 +158,27 @@ describe('the feedback bot', () => {
     expect(privateAnswer(stale)).toBe('Feedback #7 is no longer held: the bot has restarted since it was posted.')
   })
 
-  it("posts nothing and keeps nothing when the review channel can't be reached", async () => {
+  // Discord's answers once the channel is deleted, or the bot can no longer see it
+  it.each([
+    [RESTJSONErrorCodes.UnknownChannel, 404, 'Unknown Channel'],
+    [RESTJSONErrorCodes.MissingAccess, 403, 'Missing Access'],
+  ])('posts nothing and keeps nothing when the review channel answers %i', async (code, status, message) => {
     const { module, guild, review, submit } = setup()
-    // As Discord answers once the channel is deleted, or the bot can no longer see it
-    guild.channels.fetch.mockRejectedValueOnce(Object.assign(new Error('Unknown Channel'), { code: 10003 }))
+    guild.channels.fetch.mockRejectedValueOnce(discordError(code, status, message))
 
     // An operator's mistake rather than the member's, so it's an error that names the setting to fix
     await expect(module.dispatch(submit())).rejects.toThrow('FEEDBACK_CHANNEL_ID')
     expect(review.send).not.toHaveBeenCalled()
     // The submission isn't held, so no review post can later point at it
     expect(() => module.get(FeedbackService).decide(1, 'approved')).toThrow('no longer held')
+  })
+
+  it('reports a failure to reach Discord as itself, not as a missing channel', async () => {
+    const { module, guild, review, submit } = setup()
+    guild.channels.fetch.mockRejectedValueOnce(discordError(0, 503, 'Service Unavailable'))
+
+    await expect(module.dispatch(submit())).rejects.toThrow('Service Unavailable')
+    expect(review.send).not.toHaveBeenCalled()
   })
 
   it('completes the verdict when the author has closed their direct messages', async () => {

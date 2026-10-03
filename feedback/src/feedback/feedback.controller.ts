@@ -3,11 +3,13 @@ import {
   ButtonBuilder,
   ButtonStyle,
   type ChatInputCommandInteraction,
+  DiscordAPIError,
   EmbedBuilder,
   LabelBuilder,
   MessageFlags,
   ModalBuilder,
   type ModalSubmitInteraction,
+  RESTJSONErrorCodes,
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js'
@@ -17,6 +19,8 @@ import { CommandType } from 'meocord/enum'
 import { FeedbackCommandBuilder } from '@src/feedback/feedback.builder'
 import { FeedbackService } from '@src/feedback/feedback.service'
 import { FeedbackSettings } from '@src/feedback/feedback.settings'
+
+const UNREACHABLE = new Set<number | string>([RESTJSONErrorCodes.UnknownChannel, RESTJSONErrorCodes.MissingAccess])
 
 const field = (customId: string, label: string, style: TextInputStyle, maxLength: number) =>
   new LabelBuilder()
@@ -48,8 +52,12 @@ export class FeedbackController {
   // The form's fields arrive in the handler's params, named by their custom IDs
   @Command('feedback/submit', CommandType.MODAL_SUBMIT)
   async submit(interaction: ModalSubmitInteraction, { about, details }: { about: string; details: string }) {
-    // The channel first, so a submission that can't be posted isn't kept for a review that never comes
-    const channel = await interaction.guild?.channels.fetch(this.settings.reviewChannelId).catch(() => null)
+    // The channel first, so a submission that can't be posted isn't kept for a review that never comes. Discord's
+    // answers for a deleted or hidden channel mean the setting is wrong; any other failure is reported as itself
+    const channel = await interaction.guild?.channels.fetch(this.settings.reviewChannelId).catch((error: unknown) => {
+      if (error instanceof DiscordAPIError && UNREACHABLE.has(error.code)) return null
+      throw error
+    })
     if (!channel?.isSendable()) throw new Error('FEEDBACK_CHANNEL_ID names no channel the bot can post in.')
     const feedback = this.feedback.add({ authorId: interaction.user.id, about, details })
 
