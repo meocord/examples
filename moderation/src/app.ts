@@ -1,40 +1,15 @@
-import { GatewayIntentBits, Partials } from 'discord.js'
+import { GatewayIntentBits } from 'discord.js'
 import { MeoCord } from 'meocord/decorator'
-import { SampleSlashController } from '@src/controllers/slash/sample.slash.controller'
-import { SampleSelectMenuController } from '@src/controllers/select-menu/sample.select-menu.controller'
-import { SampleButtonController } from '@src/controllers/button/sample.button.controller'
-import { SampleMessageController } from '@src/controllers/message/sample.message.controller'
-import { SampleReactionController } from '@src/controllers/reaction/sample.reaction.controller'
-import { SampleContextMenuController } from '@src/controllers/context-menu/sample.context-menu.controller'
-import { SampleModalSubmitController } from '@src/controllers/modal-submit/sample.modal-submit.controller'
+import { databaseProvider } from '@src/database/database.provider'
+import { ModController } from '@src/moderation/mod.controller'
 import { AppPresenter } from '@src/presenters/app.presenter'
 
 @MeoCord({
-  controllers: [
-    // Slash Commands
-    SampleSlashController,
-    // Select Menu
-    SampleSelectMenuController,
-    // Buttons
-    SampleButtonController,
-    // Message
-    SampleMessageController,
-    // Reactions
-    SampleReactionController,
-    // Context Menu
-    SampleContextMenuController,
-    // Modal Submit
-    SampleModalSubmitController,
-  ],
-  clientOptions: {
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.GuildMessageReactions,
-      GatewayIntentBits.MessageContent,
-    ],
-    partials: [Partials.Message, Partials.Reaction],
-  },
+  controllers: [ModController],
+  // The case log's SQLite database, opened before the bot logs in and closed as it stops
+  providers: [databaseProvider],
+  // Interactions carry the members and roles the guards compare; the bot reads no messages
+  clientOptions: { intents: [GatewayIntentBits.Guilds] },
   // How loading and error views look; see src/presenters/app.presenter.ts
   presenter: AppPresenter,
 })
