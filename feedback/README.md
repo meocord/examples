@@ -29,7 +29,11 @@ the feedback is gone.
 
 1. In the [Discord developer portal](https://discord.com/developers/applications), create an application with a bot,
    and invite it to your server with the `bot` and `applications.commands` scopes. It needs no privileged intents.
-2. Create a staff role, and a channel for reviews where the bot can send messages.
+2. Create a staff role, and a channel for reviews. In that channel, the bot needs **View Channel**, **Send Messages**
+   and **Embed Links**, since each review is posted as an embed. It needs no other permission: it answers members
+   and edits the review post through the interactions themselves, and a direct message to the author needs none.
+   With **Developer Mode** on in Discord's settings, **Copy ID** on the channel and the role gives their IDs. The bot
+   checks both as it starts, and stops with the name of the one that's missing or isn't an ID.
 3. Copy the example environment file, and fill it in:
 
    ```shell
