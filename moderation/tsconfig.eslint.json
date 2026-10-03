@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["meocord.config.ts", "vitest.config.ts", "vitest.setup.ts", "eslint.config.ts"],
+  "exclude": ["node_modules"]
+}
