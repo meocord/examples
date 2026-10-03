@@ -34,7 +34,11 @@ const offender = createMockUser({ id: '200000000000000003' })
 const veteran = createMockUser({ id: '200000000000000004' })
 const botUser = createMockUser({ id: '200000000000000009', bot: true })
 
-/** The server's roles, made for each test, since vitest.setup.ts resets every mock after one. */
+/**
+ * The server's roles, made for each test. The template's vitest.setup.ts resets every mock after each test, stubbed
+ * implementations included, so roles shared between tests would lose their comparePositionTo after the first, and the
+ * tests would pass or fail by the order they run in.
+ */
 function makeRoles() {
   const rolesById = new Map<string, Role>()
   const role = (id: string, position: number, ...permissions: bigint[]) => {
