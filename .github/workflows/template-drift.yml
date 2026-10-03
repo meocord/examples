@@ -1,8 +1,9 @@
 name: Template drift
 
-# Compares each bot's tooling and config with what `meocord create` generates from the newest release, and shows the
-# differences in the run's summary. A bot may differ on purpose, as a new key in .env.example, so it reports rather
-# than fails; the run fails only when an app can't be generated. It reads the repository and changes nothing.
+# Compares each bot's tooling and config with what `meocord create` generates from the newest release. A difference a
+# bot means to keep is accepted in template-drift.json with the reason; any other fails the run, which names the file,
+# shows the diff and says how to accept it. The report is also in the run's summary. It reads the repository and
+# changes nothing.
 on:
   schedule:
     - cron: '17 5 * * 1'
@@ -30,8 +31,9 @@ jobs:
       - name: Compare with a newly generated app
         run: |
           set -o pipefail
-          node scripts/template-drift.mjs | tee drift.md
+          node scripts/template-drift.mjs --check | tee drift.md
 
+      # Written whether or not a bot drifted
       - name: Summary
         if: always()
         run: |

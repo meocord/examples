@@ -1,0 +1,10 @@
+{
+  "feedback": {
+    ".env.example": {
+      "keys": {
+        "FEEDBACK_CHANNEL_ID": "The channel submitted feedback is posted to for review",
+        "STAFF_ROLE_ID": "The role whose members may approve or reject feedback"
+      }
+    }
+  }
+}
