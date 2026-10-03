@@ -1,0 +1,38 @@
+name: Template drift
+
+# Compares each bot's tooling and config with what `meocord create` generates from the newest release, and shows the
+# differences in the run's summary. A bot may differ on purpose, as a new key in .env.example, so it reports rather
+# than fails; the run fails only when an app can't be generated. It reads the repository and changes nothing.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Template drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+
+      - name: Compare with a newly generated app
+        run: |
+          set -o pipefail
+          node scripts/template-drift.mjs | tee drift.md
+
+      - name: Summary
+        if: always()
+        run: |
+          { echo '```diff'; cat drift.md; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
