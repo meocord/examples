@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Every bot, as one npm project each. A new bot adds its folder here; scripts/bots.mjs fails CI until it does.
+  # meocord is grouped across the bots, so one pull request moves them all to a release and CI tests them together.
+  - package-ecosystem: npm
+    directories:
+      - /feedback
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+    groups:
+      meocord:
+        patterns: ['meocord']
+        group-by: dependency-name
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # The bots keep the TypeScript major `meocord create` generates; a new major arrives with the template
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
