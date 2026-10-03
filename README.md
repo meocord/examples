@@ -48,6 +48,8 @@ covers creating the Discord application and inviting the bot.
 3. Add its folder to the npm entry's `directories` in `.github/dependabot.yml`; CI fails until it's there.
 4. Accept in `template-drift.json` what it changes in the template's files on purpose, as
    `node scripts/template-drift.mjs --check <bot>` shows.
+5. If it checks settings from `.env` as it starts, give each one a made-up value in `scripts/smoke-env.json`, so the
+   start check reaches the token.
 
 ## License
 

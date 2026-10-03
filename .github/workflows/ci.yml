@@ -41,6 +41,24 @@ jobs:
         id: list
         run: echo "matrix=$(node scripts/bots.mjs)" >> "$GITHUB_OUTPUT"
 
+  scripts:
+    name: Scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+
+      - name: Test the scripts CI runs
+        run: node --test scripts/*.test.mjs
+
   bot:
     name: ${{ matrix.bot }} (meocord ${{ matrix.meocord }}, Node ${{ matrix.node }})
     needs: bots
@@ -72,9 +90,10 @@ jobs:
         working-directory: ${{ matrix.bot }}
         run: npm install --no-save meocord@${{ matrix.meocord }}
 
+      # Read from the installed package: `npm ls` exits 1 for a version outside the bot's range, as a beta or a new major
       - name: Show the meocord under test
         working-directory: ${{ matrix.bot }}
-        run: npm ls meocord
+        run: node -p "'meocord ' + require('./node_modules/meocord/package.json').version"
 
       # The bot's lint fixes what it can, so a file it changes is one that was committed unformatted
       - name: Lint
@@ -97,15 +116,16 @@ jobs:
   # One check for branch protection to require, however many bots the matrix holds
   ci:
     name: CI
-    needs: [bots, bot]
+    needs: [scripts, bots, bot]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Every bot passed
+      - name: Every job passed
         env:
+          SCRIPTS: ${{ needs.scripts.result }}
           BOTS: ${{ needs.bots.result }}
           BOT: ${{ needs.bot.result }}
         run: |
-          echo "Find the bots: $BOTS; bots: $BOT"
-          test "$BOTS" = success && test "$BOT" = success
+          echo "Scripts: $SCRIPTS; find the bots: $BOTS; bots: $BOT"
+          test "$SCRIPTS" = success && test "$BOTS" = success && test "$BOT" = success
