@@ -48,9 +48,10 @@ export class FeedbackController {
   // The form's fields arrive in the handler's params, named by their custom IDs
   @Command('feedback/submit', CommandType.MODAL_SUBMIT)
   async submit(interaction: ModalSubmitInteraction, { about, details }: { about: string; details: string }) {
-    const feedback = this.feedback.add({ authorId: interaction.user.id, about, details })
-    const channel = await interaction.guild?.channels.fetch(this.settings.reviewChannelId)
+    // The channel first, so a submission that can't be posted isn't kept for a review that never comes
+    const channel = await interaction.guild?.channels.fetch(this.settings.reviewChannelId).catch(() => null)
     if (!channel?.isSendable()) throw new Error('FEEDBACK_CHANNEL_ID names no channel the bot can post in.')
+    const feedback = this.feedback.add({ authorId: interaction.user.id, about, details })
 
     // A post to a channel isn't an answer, so it takes the theme's colour itself; respond() fills in the rest
     const button = (verdict: 'approve' | 'reject', label: string, style: ButtonStyle) =>
