@@ -1,8 +1,9 @@
 name: CI
 
-# Every bot, with the meocord its lockfile pins and with the newest release on npm: install, lint, test, a production
-# build, and a start with no token and with one Discord refuses. No Discord token is used or stored anywhere. The daily
-# run catches a meocord release that breaks a bot before a pull request does.
+# Every bot, with the meocord its lockfile pins and with the newest release on npm, on the newest Node LTS and on the
+# oldest Node meocord supports, and with the beta release while one is newer (scripts/bots.mjs builds the rows):
+# install, lint, test, a production build, and a start with no token and with one Discord refuses. No Discord token is
+# used or stored anywhere. The daily run catches a meocord release that breaks a bot before a pull request does.
 on:
   pull_request:
   push:
@@ -24,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      bots: ${{ steps.list.outputs.bots }}
+      matrix: ${{ steps.list.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,20 +37,19 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: List the bots
+      - name: List the bots and the versions to test
         id: list
-        run: echo "bots=$(node scripts/bots.mjs)" >> "$GITHUB_OUTPUT"
+        run: echo "matrix=$(node scripts/bots.mjs)" >> "$GITHUB_OUTPUT"
 
   bot:
-    name: ${{ matrix.bot }} (${{ matrix.meocord }})
+    name: ${{ matrix.bot }} (meocord ${{ matrix.meocord }}, Node ${{ matrix.node }})
     needs: bots
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        bot: ${{ fromJSON(needs.bots.outputs.bots) }}
-        meocord: [pinned, latest]
+        include: ${{ fromJSON(needs.bots.outputs.matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,7 +59,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: lts/*
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: ${{ matrix.bot }}/package-lock.json
 
@@ -67,10 +67,10 @@ jobs:
         working-directory: ${{ matrix.bot }}
         run: npm ci
 
-      - name: Install the newest meocord
-        if: matrix.meocord == 'latest'
+      - name: Install meocord@${{ matrix.meocord }}
+        if: matrix.meocord != 'pinned'
         working-directory: ${{ matrix.bot }}
-        run: npm install --no-save meocord@latest
+        run: npm install --no-save meocord@${{ matrix.meocord }}
 
       - name: Show the meocord under test
         working-directory: ${{ matrix.bot }}
