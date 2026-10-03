@@ -1,0 +1,48 @@
+{
+  "name": "feedback",
+  "version": "0.1.0",
+  "description": "",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build:dev": "meocord build --dev",
+    "build:prod": "meocord build --prod",
+    "start": "meocord start --prod",
+    "start:dev": "meocord start --dev",
+    "start:prod": "meocord start --prod",
+    "register": "meocord register --build",
+    "lint": "eslint --fix && tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "dotenv": "^18.0.5",
+    "meocord": "^4.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.3",
+    "@typescript-eslint/parser": "^8.71.0",
+    "@vitest/coverage-istanbul": "^5.0.3",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "reflect-metadata": "^0.2.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "@swc/core": false,
+    "fsevents": false,
+    "unrs-resolver": false
+  }
+}
