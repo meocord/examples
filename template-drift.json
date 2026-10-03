@@ -12,6 +12,12 @@
       "keys": {
         "MODERATION_DB": "Where the case log’s SQLite file is kept, moderation.db by default"
       }
+    },
+    ".gitignore": {
+      "diff": {
+        "hash": "84213cd8c8aa",
+        "why": "Keeps the case log’s SQLite file, and its journal and WAL files, out of git"
+      }
     }
   }
 }
