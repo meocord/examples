@@ -6,6 +6,9 @@ name: CI
 # used or stored anywhere. The daily run catches a meocord release that breaks a bot before a pull request does.
 on:
   pull_request:
+  # The merge queue runs CI on each queued pull request merged with main, and lands it only if CI passes there
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   schedule:
@@ -15,9 +18,10 @@ on:
 permissions:
   contents: read
 
+# A pull request's new push replaces its run; a merge group's ref is its own, and main's runs all finish
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   bots:
