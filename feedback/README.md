@@ -1,106 +1,62 @@
-# feedback
+# Feedback bot
 
-A Discord bot built with [MeoCord](https://meocord.dev).
+A Discord bot built with [MeoCord](https://meocord.dev) that collects feedback from a server's members and lets its
+staff review it.
+
+- `/feedback` opens a form. Each member can open one every five minutes; a second try is told how long to wait.
+- A submitted form is posted to a review channel with **Approve** and **Reject** buttons, and the author is thanked
+  privately.
+- Only members with the staff role can use the buttons. A verdict marks the post, removes its buttons, and tells the
+  author by direct message.
+
+Feedback is kept in memory, so a restart forgets it. A review button left from before a restart tells the staff member
+the feedback is gone.
+
+## What it shows
+
+| Feature                                                                                         | Where                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A slash command that opens a modal, and the modal's fields arriving in the handler's params     | [`feedback.controller.ts`](src/feedback/feedback.controller.ts); [Components](https://meocord.dev/docs/latest/components)                                           |
+| A cooldown per member                                                                           | `@Cooldown` in [`feedback.controller.ts`](src/feedback/feedback.controller.ts); [Cooldowns](https://meocord.dev/docs/latest/cooldowns)                              |
+| Buttons routed by a typed custom ID, `feedback/{id:int}/approve`                                | [`review.controller.ts`](src/feedback/review.controller.ts); [Components](https://meocord.dev/docs/latest/components)                                               |
+| A guard on a whole controller that denies with a reason                                         | [`staff.guard.ts`](src/feedback/staff.guard.ts); [Guards](https://meocord.dev/docs/latest/guards)                                                                   |
+| `@Defer`, which acknowledges a click and locks the post until the verdict is in                 | [`review.controller.ts`](src/feedback/review.controller.ts); [Deferring a response](https://meocord.dev/docs/latest/defer)                                          |
+| Answers through `respond()`, and a `UserError` shown only to the user who clicked               | [`feedback.service.ts`](src/feedback/feedback.service.ts); [Responses](https://meocord.dev/docs/latest/responses)                                                   |
+| A presenter that draws MeoCord's own loading and error views, and theme colours                 | [`app.presenter.ts`](src/presenters/app.presenter.ts); [Presenters](https://meocord.dev/docs/latest/presenters), [Theming](https://meocord.dev/docs/latest/theming) |
+| Tests of the whole app through `MeoCordTestingModule.fromApp` and `dispatch`, with mock members | [`feedback.spec.ts`](src/feedback/feedback.spec.ts); [Testing](https://meocord.dev/docs/latest/testing)                                                             |
 
 ## Setup
 
-Copy the example environment file and add your bot token:
+1. In the [Discord developer portal](https://discord.com/developers/applications), create an application with a bot,
+   and invite it to your server with the `bot` and `applications.commands` scopes. It needs no privileged intents.
+2. Create a staff role, and a channel for reviews where the bot can send messages.
+3. Copy the example environment file, and fill it in:
 
-```shell
-cp .env.example .env
-```
+   ```shell
+   cp .env.example .env
+   ```
 
-`.env` is gitignored. Never commit a real token — if one is pushed, reset it in the
-[Discord developer portal](https://discord.com/developers/applications) rather than
-rewriting history.
+   `DISCORD_TOKEN` is your bot's token, `FEEDBACK_CHANNEL_ID` the review channel's ID, and `STAFF_ROLE_ID` the staff
+   role's ID. `.env` is gitignored: never commit a real token. If one is pushed, reset it in the developer portal
+   rather than rewriting history.
 
 ## Running
 
 ```shell
+npm install
 npm run start:dev    # watch mode, rebuilds and restarts on change
 npm run build:prod   # a production build
 npm start            # starts the last production build
 ```
 
-`start` runs the production build as it is, so build again after a change. A host that runs
-`npm start` for you starts the bot the same way; give it `npm run build:prod` as
-its build step. `start:prod` is the same command.
-
-The bot runs on whichever runtime you launch it with — launch with bun and it is a bun
-process, launch with node and it is a node process. Node needs to be 22.13 or newer.
-
-## Registering commands
-
-The bot registers its commands when it starts: globally in production, and to the guild in
-`DEV_GUILD_ID`, when set, under `start:dev`, where changes show at once. In development an
-unchanged set is not sent again; `npx meocord start --dev --force-register` sends it anyway.
-
-To register without starting the bot, as a deploy step for instance:
-
-```shell
-npm run register     # builds for production, then registers
-```
-
-Set `commands.register: false` in `meocord.config.ts` to leave registration to that step.
-
-## Building
-
-```shell
-npm run build:dev
-npm run build:prod
-```
-
-## Answering interactions
-
-The sample controllers answer through `respond(interaction)` from `meocord/common`, which
-picks the right Discord call — reply, update, edit or follow-up — from where the answer
-stands. `@Defer()` acknowledges before a slow handler runs, and on a button or menu
-disables the message's controls with a loading view until the handler answers.
-`src/presenters/app.presenter.ts` decides how the loading and error views look.
-
-`@Cooldown({ uses: 5, seconds: 60 })` limits how often a user can run a handler, and
-`src/guards/owner.guard.ts` shows a guard that denies with a reason by throwing
-`GuardDeniedError`.
-
-## Generating components
-
-```shell
-npx meocord g co slash "profile"     # a slash controller, its spec and its builder
-npx meocord g s "profile"            # a service
-npx meocord g gu "role"              # a guard
-npx meocord g i "timing"             # an interceptor
-npx meocord g f "not-found"          # an exception filter
-npx meocord g pi "account"           # a pipe
-npx meocord g ob "audit"             # a dispatch observer
-npx meocord g --help                 # every generator
-```
-
-Each comes with a spec. Add a generated controller to the `controllers` array in
-`src/app.ts`: controllers are wired up by that list, not by where they sit on disk. A
-service is injected where it is needed. Guards, interceptors, filters and pipes apply
-where you declare them, with `@UseGuard`, `@UseInterceptor`, `@UseFilter` and
-`@UsePipe` or `@Validate`, or to every handler through `@MeoCord({ guards,
-interceptors, filters })`. An observer hears about every call once listed in
-`@MeoCord({ observers })`.
+The bot registers `/feedback` as it starts: to the server in `DEV_GUILD_ID` under `start:dev`, and globally in
+production.
 
 ## Testing
 
 ```shell
-npm run test
-npm run test:watch
-npm run test:coverage
-```
-
-`meocord/testing` provides `MeoCordTestingModule` for building a controller with its
-dependencies, `invoke` for running a handler through its guards, interceptors and
-filters as the bot does, and `createMockInteraction` and friends for driving it without
-a Discord connection. `vitest.setup.ts` resets those mocks after every test, so set
-what a mock returns in the test, or in `beforeEach`, that relies on it.
-
-## Linting
-
-```shell
+npm test
 npm run lint
 ```
 
-ESLint, then `tsc` over `src/` and `meocord.config.ts`, and the test typecheck.
+The tests run the app as the bot does, with mock interactions, and no Discord connection or token.

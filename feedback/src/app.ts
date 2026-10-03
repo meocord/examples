@@ -1,40 +1,13 @@
-import { GatewayIntentBits, Partials } from 'discord.js'
+import { GatewayIntentBits } from 'discord.js'
 import { MeoCord } from 'meocord/decorator'
-import { SampleSlashController } from '@src/controllers/slash/sample.slash.controller'
-import { SampleSelectMenuController } from '@src/controllers/select-menu/sample.select-menu.controller'
-import { SampleButtonController } from '@src/controllers/button/sample.button.controller'
-import { SampleMessageController } from '@src/controllers/message/sample.message.controller'
-import { SampleReactionController } from '@src/controllers/reaction/sample.reaction.controller'
-import { SampleContextMenuController } from '@src/controllers/context-menu/sample.context-menu.controller'
-import { SampleModalSubmitController } from '@src/controllers/modal-submit/sample.modal-submit.controller'
+import { FeedbackController } from '@src/feedback/feedback.controller'
+import { ReviewController } from '@src/feedback/review.controller'
 import { AppPresenter } from '@src/presenters/app.presenter'
 
 @MeoCord({
-  controllers: [
-    // Slash Commands
-    SampleSlashController,
-    // Select Menu
-    SampleSelectMenuController,
-    // Buttons
-    SampleButtonController,
-    // Message
-    SampleMessageController,
-    // Reactions
-    SampleReactionController,
-    // Context Menu
-    SampleContextMenuController,
-    // Modal Submit
-    SampleModalSubmitController,
-  ],
-  clientOptions: {
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.GuildMessageReactions,
-      GatewayIntentBits.MessageContent,
-    ],
-    partials: [Partials.Message, Partials.Reaction],
-  },
+  controllers: [FeedbackController, ReviewController],
+  // Interactions arrive with Guilds alone, and direct messages are sent, never read
+  clientOptions: { intents: [GatewayIntentBits.Guilds] },
   // How loading and error views look; see src/presenters/app.presenter.ts
   presenter: AppPresenter,
 })
