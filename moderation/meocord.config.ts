@@ -1,0 +1,35 @@
+import { config } from 'dotenv'
+import { type MeoCordConfig } from 'meocord/interface'
+
+// The .env files Bun reads, most specific first: dotenv keeps the first value a variable is given, and one set in the
+// shell over all of them. A production build reads the production files, however the bot is started.
+const mode = process.env.NODE_ENV || 'development'
+config({
+  path: [`.env.${mode}.local`, ...(mode === 'test' ? [] : ['.env.local']), `.env.${mode}`, '.env'],
+  quiet: true,
+})
+
+export default {
+  appName: 'moderation',
+  // Read from the environment rather than written here: this file is committed, and a
+  // token pasted into it is a token pushed to the remote. Copy .env.example to .env.
+  discordToken: process.env.DISCORD_TOKEN!,
+  // Discord requires sharding from about 2,500 servers. Every shard runs in this process unless mode is 'process'.
+  // sharding: { shards: 'auto' },
+  commands: {
+    // Registers globally in production. In development every command goes to this guild instead,
+    // where changes show at once; leave DEV_GUILD_ID empty to register globally there too.
+    developmentGuild: process.env.DEV_GUILD_ID || undefined,
+  },
+  rsbuild: config => {
+    // Images, fonts, svg and media are handled by the bundler already. Markdown and HTML are
+    // not, and `asset/source` is what makes `import readme from './readme.md'` give you the
+    // file's text rather than a path to it.
+    config.tools ??= {}
+    config.tools.rspack = (_rspackConfig, { addRules }) => {
+      addRules([{ test: /\.(md|html)$/i, type: 'asset/source' }])
+    }
+
+    return config
+  },
+} satisfies MeoCordConfig

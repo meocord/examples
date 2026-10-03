@@ -1,0 +1,106 @@
+# moderation
+
+A Discord bot built with [MeoCord](https://meocord.dev).
+
+## Setup
+
+Copy the example environment file and add your bot token:
+
+```shell
+cp .env.example .env
+```
+
+`.env` is gitignored. Never commit a real token — if one is pushed, reset it in the
+[Discord developer portal](https://discord.com/developers/applications) rather than
+rewriting history.
+
+## Running
+
+```shell
+npm run start:dev    # watch mode, rebuilds and restarts on change
+npm run build:prod   # a production build
+npm start            # starts the last production build
+```
+
+`start` runs the production build as it is, so build again after a change. A host that runs
+`npm start` for you starts the bot the same way; give it `npm run build:prod` as
+its build step. `start:prod` is the same command.
+
+The bot runs on whichever runtime you launch it with — launch with bun and it is a bun
+process, launch with node and it is a node process. Node needs to be 22.13 or newer.
+
+## Registering commands
+
+The bot registers its commands when it starts: globally in production, and to the guild in
+`DEV_GUILD_ID`, when set, under `start:dev`, where changes show at once. In development an
+unchanged set is not sent again; `npx meocord start --dev --force-register` sends it anyway.
+
+To register without starting the bot, as a deploy step for instance:
+
+```shell
+npm run register     # builds for production, then registers
+```
+
+Set `commands.register: false` in `meocord.config.ts` to leave registration to that step.
+
+## Building
+
+```shell
+npm run build:dev
+npm run build:prod
+```
+
+## Answering interactions
+
+The sample controllers answer through `respond(interaction)` from `meocord/common`, which
+picks the right Discord call — reply, update, edit or follow-up — from where the answer
+stands. `@Defer()` acknowledges before a slow handler runs, and on a button or menu
+disables the message's controls with a loading view until the handler answers.
+`src/presenters/app.presenter.ts` decides how the loading and error views look.
+
+`@Cooldown({ uses: 5, seconds: 60 })` limits how often a user can run a handler, and
+`src/guards/owner.guard.ts` shows a guard that denies with a reason by throwing
+`GuardDeniedError`.
+
+## Generating components
+
+```shell
+npx meocord g co slash "profile"     # a slash controller, its spec and its builder
+npx meocord g s "profile"            # a service
+npx meocord g gu "role"              # a guard
+npx meocord g i "timing"             # an interceptor
+npx meocord g f "not-found"          # an exception filter
+npx meocord g pi "account"           # a pipe
+npx meocord g ob "audit"             # a dispatch observer
+npx meocord g --help                 # every generator
+```
+
+Each comes with a spec. Add a generated controller to the `controllers` array in
+`src/app.ts`: controllers are wired up by that list, not by where they sit on disk. A
+service is injected where it is needed. Guards, interceptors, filters and pipes apply
+where you declare them, with `@UseGuard`, `@UseInterceptor`, `@UseFilter` and
+`@UsePipe` or `@Validate`, or to every handler through `@MeoCord({ guards,
+interceptors, filters })`. An observer hears about every call once listed in
+`@MeoCord({ observers })`.
+
+## Testing
+
+```shell
+npm run test
+npm run test:watch
+npm run test:coverage
+```
+
+`meocord/testing` provides `MeoCordTestingModule` for building a controller with its
+dependencies, `invoke` for running a handler through its guards, interceptors and
+filters as the bot does, and `createMockInteraction` and friends for driving it without
+a Discord connection. `vitest.setup.ts` resets those mocks after every test, so set
+what a mock returns in the test, or in `beforeEach`, that relies on it.
+
+## Linting
+
+```shell
+npm run lint
+```
+
+ESLint, then `tsc` over `src/` and `meocord.config.ts`, and the test typecheck.

@@ -1,0 +1,26 @@
+import { ButtonInteraction } from 'discord.js'
+import { respond } from 'meocord/common'
+import { Command, Controller, Cooldown, Defer, UseGuard } from 'meocord/decorator'
+import { CommandType } from 'meocord/enum'
+import { OwnerGuard } from '@src/guards/owner.guard'
+
+@Controller()
+export class SampleButtonController {
+  // The message's buttons are disabled with a loading view while this runs; send() without
+  // components puts them back as they were
+  @Command('button-click', CommandType.BUTTON)
+  @Cooldown({ uses: 5, seconds: 60 })
+  @Defer()
+  async handleButton(interaction: ButtonInteraction) {
+    await respond(interaction).send({ content: 'Button clicked!' })
+  }
+
+  // Only the user whose id the customId carries gets past OwnerGuard
+  @Command('button-with/{ownerId}', CommandType.BUTTON)
+  @UseGuard(OwnerGuard)
+  @Cooldown({ uses: 5, seconds: 60 })
+  @Defer()
+  async handleButtonWithId(interaction: ButtonInteraction, { ownerId }: { ownerId: string }) {
+    await respond(interaction).send({ content: `Button of <@${ownerId}> clicked!` })
+  }
+}
