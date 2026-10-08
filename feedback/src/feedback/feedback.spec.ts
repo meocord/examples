@@ -10,6 +10,7 @@ import {
 } from 'discord.js'
 import {
   createMockChannel,
+  createMockClient,
   createMockGuild,
   createMockInteraction,
   createMockMember,
@@ -46,7 +47,9 @@ function setup() {
     .overrideProvider(FeedbackSettings)
     .useValue({ reviewChannelId: review.id, staffRoleId: staffRole.id })
     .compile()
-  const inGuild = { guildId: guild.id, guild }
+  // One client for every interaction, as in the bot, so a DM any handler sends is read from it
+  const client = createMockClient()
+  const inGuild = { guildId: guild.id, guild, client }
   const command = (user = author) =>
     createMockInteraction(ChatInputCommandInteraction, { commandName: 'feedback', user, ...inGuild })
   const submit = () =>
@@ -65,7 +68,7 @@ function setup() {
       message: createMockMessage({ embeds: posted().embeds }),
       ...inGuild,
     })
-  return { module, guild, review, command, submit, click, posted }
+  return { module, client, guild, review, command, submit, click, posted }
 }
 
 /** An error as discord.js throws it for Discord's answer to a request. */
@@ -86,7 +89,7 @@ const privateAnswer = (interaction: ButtonInteraction) => {
 
 describe('the feedback bot', () => {
   it('takes feedback through a form, posts it for review, and tells the author what staff decided', async () => {
-    const { module, command, submit, click, posted } = setup()
+    const { module, client, command, submit, click, posted } = setup()
 
     const opened = command()
     await module.dispatch(opened)
@@ -118,7 +121,7 @@ describe('the feedback bot', () => {
     )
     expect(verdict.embeds[0].footer?.text).toContain('Approved')
     expect(verdict.components).toEqual([])
-    expect(approved.client.users.send).toHaveBeenCalledWith(
+    expect(client.users.send).toHaveBeenCalledWith(
       author.id,
       expect.objectContaining({ content: expect.stringContaining('Dark mode') }),
     )
@@ -136,7 +139,7 @@ describe('the feedback bot', () => {
   })
 
   it('leaves the review post as it is when someone without the staff role clicks, telling only them why', async () => {
-    const { module, submit, click } = setup()
+    const { module, client, submit, click } = setup()
     await module.dispatch(submit())
 
     const denied = click('feedback/1/approve', stranger)
@@ -146,7 +149,7 @@ describe('the feedback bot', () => {
     // The guard runs before the handler locks the post, so nothing but the acknowledgement touches it
     expect(getResponse(denied).calls.map(call => call.method)).toEqual(['deferUpdate', 'followUp'])
     expect(privateAnswer(denied)).toBe('Only staff can review feedback.')
-    expect(denied.client.users.send).not.toHaveBeenCalled()
+    expect(client.users.send).not.toHaveBeenCalled()
   })
 
   it('tells staff a review post is out of date when the bot no longer holds its feedback, as after a restart', async () => {
@@ -182,11 +185,11 @@ describe('the feedback bot', () => {
   })
 
   it('completes the verdict when the author has closed their direct messages', async () => {
-    const { module, submit, click } = setup()
+    const { module, client, submit, click } = setup()
     await module.dispatch(submit())
 
     const approved = click('feedback/1/approve', reviewer)
-    approved.client.users.send.mockRejectedValueOnce(new Error('Cannot send messages to this user'))
+    client.users.send.mockRejectedValueOnce(new Error('Cannot send messages to this user'))
     await module.dispatch(approved)
 
     // The post is edited with the verdict, and the reviewer sees no error for a DM they couldn't control
@@ -198,7 +201,7 @@ describe('the feedback bot', () => {
   })
 
   it('refuses a second verdict on the same feedback, leaving the post and the author alone', async () => {
-    const { module, submit, click } = setup()
+    const { module, client, submit, click } = setup()
     await module.dispatch(submit())
     await module.dispatch(click('feedback/1/approve', reviewer))
 
@@ -206,6 +209,7 @@ describe('the feedback bot', () => {
     await module.dispatch(late)
 
     expect(privateAnswer(late)).toBe('Feedback #1 was already approved.')
-    expect(late.client.users.send).not.toHaveBeenCalled()
+    // The author heard once, of the first verdict
+    expect(client.users.send).toHaveBeenCalledTimes(1)
   })
 })
