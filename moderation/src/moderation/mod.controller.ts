@@ -22,7 +22,7 @@ import { HierarchyGuard, memberOf, OwnerGuard, rankProblem, RequirePermission } 
 import { CasesMenuBuilder, ModCommandBuilder, WarnAuthorMenuBuilder } from '@src/moderation/mod.builder'
 
 /** The moderator, the pending case and the answer, such as `mod/111/12/confirm`, each typed for the handler. */
-export const answer = route('mod/{ownerId}/{case:int}/{action:confirm|cancel}')
+export const answer = route('mod/{ownerId:snowflake}/{case:int}/{action:confirm|cancel}')
 
 /**
  * The server a moderation command runs in. Its builders limit it to servers, and the bot answers from its cache, so
