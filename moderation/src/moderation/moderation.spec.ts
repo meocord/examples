@@ -160,12 +160,13 @@ describe('the moderation bot', () => {
 
     expect(ran).toBe(false)
     expect(refusal(menu)).toMatch(/^Your highest role must be above /)
+    expect(guild.members.fetch).toHaveBeenCalledWith(veteran.id)
   })
 
   it('refuses to warn a message’s author who has left the server', async () => {
     const { module, guild, warnAuthor } = setup()
     const { menu } = warnAuthor(offender)
-    // An author who left: no longer cached, and Discord answers Unknown Member
+    // An author who left: not in the cache, and Discord answers Unknown Member
     guild.members.cache.delete(offender.id)
     guild.members.fetch.mockRejectedValueOnce(createDiscordError(RESTJSONErrorCodes.UnknownMember))
 
