@@ -32,24 +32,11 @@ const moderator = createMockUser({ id: '200000000000000001' })
 const senior = createMockUser({ id: '200000000000000002' })
 const offender = createMockUser({ id: '200000000000000003' })
 const veteran = createMockUser({ id: '200000000000000004' })
-const botUser = createMockUser({ id: '200000000000000009', bot: true })
 
-/**
- * The server's roles, made for each test. The template's vitest.setup.ts resets every mock after each test, stubbed
- * implementations included, so roles shared between tests would lose their comparePositionTo after the first, and the
- * tests would pass or fail by the order they run in.
- */
+/** The server's roles, made for each server, as a role belongs to the one server that holds it. */
 function makeRoles() {
-  const rolesById = new Map<string, Role>()
-  const role = (id: string, position: number, ...permissions: bigint[]) => {
-    const made = createMockInteraction(Role, { id, position, permissions: new PermissionsBitField(permissions) })
-    // The mock doesn't model comparePositionTo yet: it ranks by position here, as discord.js does for distinct positions
-    made.comparePositionTo.mockImplementation(
-      other => made.position - (typeof other === 'string' ? (rolesById.get(other)?.position ?? 0) : other.position),
-    )
-    rolesById.set(id, made)
-    return made
-  }
+  const role = (id: string, position: number, ...permissions: bigint[]) =>
+    createMockInteraction(Role, { id, position, permissions: new PermissionsBitField(permissions) })
   // Ranked from the bottom: moderator, the bot, a veteran member, a senior moderator who can ban
   return {
     moderator: role('300000000000000001', 2, PermissionFlagsBits.ModerateMembers),
@@ -67,11 +54,10 @@ function makeServer(id: string) {
     senior: createMockMember({ user: senior, roles: [roles.senior] }),
     offender: createMockMember({ user: offender }),
     veteran: createMockMember({ user: veteran, roles: [roles.veteran] }),
-    bot: createMockMember({ user: botUser, roles: [roles.bot] }),
   }
   const guild = createMockGuild({ id, roles: Object.values(roles), members: Object.values(members) })
-  // The mock doesn't model guild.members.me yet: the bot's own member, as the gateway caches it
-  Object.defineProperty(guild.members, 'me', { value: members.bot })
+  // The bot's own member, cached as the gateway caches it: guild.members.me is the member of the client's user
+  createMockMember({ user: guild.client.user, roles: [roles.bot], guild })
   return { guild, members, roles }
 }
 
@@ -164,10 +150,11 @@ describe('the moderation bot', () => {
 
   // A message's member is only a cache lookup, and with the Guilds intent alone its author often isn't cached
   it('fetches an uncached author, and refuses to warn one who ranks above the moderator', async () => {
-    const { module, guild, warnAuthor } = setup()
+    const { module, guild, members, warnAuthor } = setup()
     const { menu } = warnAuthor(veteran)
-    // The mock doesn't model the member cache yet: here it misses, as for an uncached author, and the fetch finds them
-    guild.members.resolve.mockReturnValueOnce(null)
+    // An author the bot hasn't cached, whom Discord's fetch returns
+    guild.members.cache.delete(veteran.id)
+    guild.members.fetch.mockResolvedValueOnce(members.veteran)
 
     const { ran } = await module.dispatch(menu)
 
@@ -178,8 +165,8 @@ describe('the moderation bot', () => {
   it('refuses to warn a message’s author who has left the server', async () => {
     const { module, guild, warnAuthor } = setup()
     const { menu } = warnAuthor(offender)
-    // The mock doesn't model the member cache yet: here it misses, and Discord answers Unknown Member
-    guild.members.resolve.mockReturnValueOnce(null)
+    // An author who left: no longer cached, and Discord answers Unknown Member
+    guild.members.cache.delete(offender.id)
     guild.members.fetch.mockRejectedValueOnce(createDiscordError(RESTJSONErrorCodes.UnknownMember))
 
     const { ran } = await module.dispatch(menu)
