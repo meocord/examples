@@ -19,14 +19,14 @@
   "dependencies": {
     "discord.js": "^14.28.1",
     "dotenv": "^18.0.10",
-    "meocord": "^4.2.3"
+    "meocord": "^4.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.6",
-    "@typescript-eslint/parser": "^8.72.2",
-    "@vitest/coverage-istanbul": "^5.1.0",
-    "eslint": "^10.14.0",
+    "@typescript-eslint/parser": "^8.73.0",
+    "@vitest/coverage-istanbul": "5.1.0",
+    "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-import-x": "^4.18.1",
@@ -36,9 +36,9 @@
     "prettier": "^3.10.1",
     "reflect-metadata": "^0.2.2",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.2",
+    "typescript-eslint": "^8.73.0",
     "unplugin-swc": "^2.0.0",
-    "vitest": "^5.0.4"
+    "vitest": "5.1.0"
   },
   "allowScripts": {
     "@swc/core": false,
